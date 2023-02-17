@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 73075f1 (add gitignore)
 # Logs
 logs
 *.log
@@ -102,7 +105,11 @@ dist
 .dynamodb/
 
 # TernJS port file
+<<<<<<< HEAD
 .tern-port
 =======
 node_modules
 >>>>>>> bc8d99f (Initial commit)
+=======
+.tern-port
+>>>>>>> 73075f1 (add gitignore)
