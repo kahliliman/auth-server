@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 let refreshTokens = [];
 
 const generateAccessToken = (user) => {
-  return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15s" });
+  return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
 };
 
 const authenticateToken = (req, res, next) => {
@@ -56,8 +56,6 @@ app.post("/auth/token", (req, res) => {
 });
 
 app.post("/auth/login", (req, res) => {
-  // TODO Authenticate User
-
   const username = req.body.username;
   const user = { name: username };
 
