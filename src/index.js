@@ -6,16 +6,19 @@ const mongoose = require("mongoose");
 const app = express();
 const jwt = require("jsonwebtoken");
 const PORT = process.env.PORT || 4100;
+const bcrypt = require("bcrypt");
 
-const uri = `mongodb+srv://marvelmoviescountdown:${process.env.MONGODB_PASSWORD}@cluster0.ja6iqpg.mongodb.net/marvelmoviescountdown-db?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://marvelmoviescountdown:${process.env.MONGODB_PASSWORD}@cluster0.ja6iqpg.mongodb.net/?retryWrites=true&w=majority`;
+const dbName = process.env.MONGODB_DATABASE;
 
 async function connect() {
   try {
     await mongoose.connect(uri, {
+      dbName: "marvelmoviescountdown-db",
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log("Connected to MongoDB");
+    console.log(`Connected to MongoDB, database ${dbName}`);
   } catch (error) {
     console.log(error);
   }
@@ -50,8 +53,6 @@ const authenticateToken = (req, res, next) => {
 };
 
 app.post("/auth/register", (req, res) => {
-  const { username, password } = req.body;
-
   const user = new User(req.body);
 
   user
@@ -59,7 +60,7 @@ app.post("/auth/register", (req, res) => {
     .then((result) => {
       res.send({
         message: "Success insert data",
-        data: result,
+        data: { username: result.username },
       });
     })
     .catch((err) => {
@@ -68,22 +69,45 @@ app.post("/auth/register", (req, res) => {
 });
 
 app.post("/auth/login", (req, res) => {
-  const username = req.body.username;
-  const user = { name: username };
+  const { username, password } = req.body;
+  // Find the username
+  User.findOne({ username })
+    .then((result) => {
+      if (!result) {
+        return res.status(404).json({ message: "No username found" });
+      }
 
-  const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
-  refreshTokens.push(refreshToken);
-  res.json({ accessToken: accessToken, refreshToken: refreshToken });
+      bcrypt
+        .compare(password, result.password)
+        .then((result) => {
+          if (!result) {
+            return res.status(403).json({ message: "Password not match" });
+          }
+
+          const user = { name: username };
+          const accessToken = generateAccessToken(user);
+          const refreshToken = generateRefreshToken(user);
+          refreshTokens.push(refreshToken);
+          res.json({ accessToken: accessToken, refreshToken: refreshToken });
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 
 app.delete("/auth/logout", (req, res) => {
-  refreshTokens = refreshTokens.filter((token) => token !== req.body.token);
+  refreshTokens = refreshTokens.filter(
+    (token) => token !== req.body.refreshToken
+  );
   res.sendStatus(204);
 });
 
 app.post("/auth/token", (req, res) => {
-  const refreshToken = req.body.token;
+  const refreshToken = req.body.refreshToken;
   if (refreshToken == null) return res.sendStatus(401);
   if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403);
 
