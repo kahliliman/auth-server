@@ -1,12 +1,13 @@
 require("dotenv").config();
 
+const User = require("./models/User");
 const express = require("express");
 const mongoose = require("mongoose");
 const app = express();
 const jwt = require("jsonwebtoken");
 const PORT = process.env.PORT || 4100;
 
-const uri = `mongodb+srv://marvelmoviescountdown:${process.env.MONGODB_PASSWORD}@cluster0.ja6iqpg.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://marvelmoviescountdown:${process.env.MONGODB_PASSWORD}@cluster0.ja6iqpg.mongodb.net/marvelmoviescountdown-db?retryWrites=true&w=majority`;
 
 async function connect() {
   try {
@@ -31,6 +32,10 @@ const generateAccessToken = (user) => {
   return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
 };
 
+const generateRefreshToken = (user) => {
+  return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "1d" });
+};
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -44,15 +49,22 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-app.post("/auth/token", (req, res) => {
-  const refreshToken = req.body.token;
-  if (refreshToken == null) return res.sendStatus(401);
-  if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403);
-  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    const accessToken = generateAccessToken({ name: user.name });
-    res.json({ accessToken: accessToken });
-  });
+app.post("/auth/register", (req, res) => {
+  const { username, password } = req.body;
+
+  const user = new User(req.body);
+
+  user
+    .save()
+    .then((result) => {
+      res.send({
+        message: "Success insert data",
+        data: result,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 
 app.post("/auth/login", (req, res) => {
@@ -60,9 +72,7 @@ app.post("/auth/login", (req, res) => {
   const user = { name: username };
 
   const accessToken = generateAccessToken(user);
-  const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: "1d",
-  });
+  const refreshToken = generateRefreshToken(user);
   refreshTokens.push(refreshToken);
   res.json({ accessToken: accessToken, refreshToken: refreshToken });
 });
@@ -70,6 +80,18 @@ app.post("/auth/login", (req, res) => {
 app.delete("/auth/logout", (req, res) => {
   refreshTokens = refreshTokens.filter((token) => token !== req.body.token);
   res.sendStatus(204);
+});
+
+app.post("/auth/token", (req, res) => {
+  const refreshToken = req.body.token;
+  if (refreshToken == null) return res.sendStatus(401);
+  if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403);
+
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    const accessToken = generateAccessToken({ name: user.name });
+    res.json({ accessToken: accessToken });
+  });
 });
 
 app.listen(PORT, () =>
